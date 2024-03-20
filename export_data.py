@@ -89,6 +89,42 @@ def get_cam_data(context):
             extrinsic_matrixes.append(get_extrinsic_matrix(scene, camera))
         return extrinsic_matrixes, intrinsic_matrixes
 
+def save_render_rgb_img(context, path):
+    scene = context.scene
+    for frame_num in range(scene.frame_start, scene.frame_end):
+        scene.frame_set(frame_num)
+        scene.render.image_settings.file_format='JPEG'
+        scene.render.filepath = f"{path}_{frame_num}_rgb.jpg"
+        bpy.ops.render.render(use_viewport = True, write_still=True)
+            
+def save_render_depth_img(context, path):
+    scene = context.scene
+    bpy.context.scene.use_nodes = True
+    tree = bpy.context.scene.node_tree
+    links = tree.links
+    # clear default nodes
+    for n in tree.nodes:
+        tree.nodes.remove(n)
+    # create input render layer node
+    rl = tree.nodes.new('CompositorNodeRLayers')
+    normalize = tree.nodes.new(type='CompositorNodeNormalize')
+    links.new(rl.outputs[2], normalize.inputs[0])
+
+    invert = tree.nodes.new(type="CompositorNodeInvert")
+    links.new(normalize.outputs[0], invert.inputs[1])
+    
+    depthViewer = tree.nodes.new(type="CompositorNodeViewer")
+    links.new(invert.outputs[0], depthViewer.inputs[0])
+
+    links.new(rl.outputs[1], depthViewer.inputs[1])
+    output = tree.nodes.new(type="CompositorNodeOutputFile")
+    output.base_path = "C:\\Users\\yun\\Desktop"
+    links.new(invert.outputs[0], output.inputs[0])
+    for frame_num in range(scene.frame_start, scene.frame_end):
+        scene.frame_set(frame_num)
+        scene.render.filepath = f"{path}_{frame_num}_depth.jpg"
+        bpy.ops.render.render(use_viewport = True, write_still=True)
+        
 ######
 class ExportTxt(bpy.types.Operator, ExportHelper):
     """Export selected cameras and objects animation to After Effects"""
@@ -105,6 +141,8 @@ class ExportTxt(bpy.types.Operator, ExportHelper):
 
     def execute(self, context):
         extrinsic_mtx, intrinsic_mtx = get_cam_data(context)
+        save_render_rgb_img(context, self.filepath.split('.')[0])
+        # save_render_depth_img(context, self.filepath.split('.')[0])
         write_txt_file(self.filepath, extrinsic_mtx, intrinsic_mtx)
         print("\nExport data Completed")
         return {'FINISHED'}
