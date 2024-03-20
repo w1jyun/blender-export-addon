@@ -67,6 +67,7 @@ def get_intrinsic_matrix(scene, cam_data):
     return np.array(K).astype('float32')
 
 def get_extrinsic_matrix(scene, camera):
+    ## TODO: check blender xyz and openGL xyz (https://stackoverflow.com/questions/64977993/applying-opencv-pose-estimation-to-blender-camera)
     extrinsic_mtx = []
     for frame_num in range(scene.frame_start, scene.frame_end):
             scene.frame_set(frame_num)
@@ -77,7 +78,6 @@ def get_extrinsic_matrix(scene, camera):
             
 def get_cam_data(context):
     scene = context.scene
-    # fps = scene.render.fps / scene.render.fps_base
     
     if context.scene.camera is None:
         raise AssertionError("Cannot find camera")
@@ -88,7 +88,9 @@ def get_cam_data(context):
             
         return extrinsic_mtx, intrinsic_mtx
 
-                
+
+######
+        
 class ExportTxt(bpy.types.Operator, ExportHelper):
     """Export selected cameras and objects animation to After Effects"""
     bl_idname = "export.txt"
