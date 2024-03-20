@@ -44,17 +44,21 @@ def get_camera_frame_ranges(scene, start, end):
 def write_txt_file(path, extrinsic_data, intrinsic_data):
         # import pdb; pdb.set_trace()
         with open(path, 'w+') as f:
-            f.write("intrinsic_data\n")
-            f.write(str(intrinsic_data))
-            f.write("extrinsic_data\n")
-            for m in extrinsic_data:
-                f.write(str(m))
+            print(intrinsic_data)
+            print(extrinsic_data)
+            frame = 0
+            for intr, extr in zip(intrinsic_data, extrinsic_data):
+                f.write(f"frame #{frame}\n")
+                f.write("intrinsic \n")
+                f.write(str(intr))
                 f.write("\n")
-            
-def get_intrinsic_matrix(scene, camera):
-    intrinsic_matrixes = []
-    for frame_num in range(scene.frame_start, scene.frame_end):
-        scene.frame_set(frame_num)
+                f.write("extrinsic \n")
+                f.write(str(extr))
+                f.write("\n")
+                frame += 1
+
+def get_intrinsic_matrix(scene, camera):        
+        # scene.frame_set(frame_num)
         cam_data = camera.data
         f_in_mm = cam_data.lens
         sensor_width_in_mm = cam_data.sensor_width
@@ -65,36 +69,27 @@ def get_intrinsic_matrix(scene, camera):
         f_y = f_x * pixel_aspect
         c_x = w * (0.5 - cam_data.shift_x)
         c_y = h * 0.5 + w * cam_data.shift_y
-        K = np.array([[f_x, 0, c_x], [0, f_y, c_y], [0,   0,   1]]).astype('float32')
-        intrinsic_matrixes.append(K)
-        
-    return intrinsic_matrixes
+        return np.array([[f_x, 0, c_x], [0, f_y, c_y], [0,   0,   1]]).astype('float32')    
 
+## TODO: check blender xyz and openGL xyz (https://stackoverflow.com/questions/64977993/applying-opencv-pose-estimation-to-blender-camera)
 def get_extrinsic_matrix(scene, camera):
-    ## TODO: check blender xyz and openGL xyz (https://stackoverflow.com/questions/64977993/applying-opencv-pose-estimation-to-blender-camera)
-    extrinsic_matrixes = []
-    for frame_num in range(scene.frame_start, scene.frame_end):
-            scene.frame_set(frame_num)
-            cam_matrix = np.array([v for v in camera.matrix_basis]).reshape(4,4).astype('float32')
-            extrinsic_matrixes.append(cam_matrix)
-            
-    return extrinsic_matrixes
+    return np.array([v for v in camera.matrix_basis]).reshape(4,4).astype('float32')
             
 def get_cam_data(context):
     scene = context.scene
-    
     if context.scene.camera is None:
         raise AssertionError("Cannot find camera")
     else:
         camera = context.scene.camera
-        intrinsic_matrixes = get_intrinsic_matrix(scene, camera)
-        extrinsic_matrixes = get_extrinsic_matrix(scene, camera)
-            
+        intrinsic_matrixes = []
+        extrinsic_matrixes = []
+        for frame_num in range(scene.frame_start, scene.frame_end):
+            scene.frame_set(frame_num)
+            intrinsic_matrixes.append(get_intrinsic_matrix(scene, camera))
+            extrinsic_matrixes.append(get_extrinsic_matrix(scene, camera))
         return extrinsic_matrixes, intrinsic_matrixes
 
-
 ######
-        
 class ExportTxt(bpy.types.Operator, ExportHelper):
     """Export selected cameras and objects animation to After Effects"""
     bl_idname = "export.txt"
