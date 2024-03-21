@@ -119,6 +119,7 @@ def save_render_depth_img(context, path):
     output = tree.nodes.new(type="CompositorNodeOutputFile")
     output.base_path = "C:\\Users\\yun\\Desktop"
     links.new(invert.outputs[0], output.inputs[0])
+    ## TODO: change data according to frame number
     for frame_num in range(context.scene.frame_start, context.scene.frame_end):
         context.scene.frame_set(frame_num)
         bpy.context.scene.render.filepath = f"{path}_{frame_num}_depth.jpg"
