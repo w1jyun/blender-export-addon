@@ -10,13 +10,13 @@ bl_info = {
 
 import bpy
 import os
-import datetime
+# import cv2
 from math import degrees
 from mathutils import Matrix, Vector, Color
 import numpy as np
 from bpy_extras.io_utils import ExportHelper
 from bpy.props import StringProperty, BoolProperty, FloatProperty
-
+# from PIL import Image
 
 def get_camera_frame_ranges(scene, start, end):
     """Get frame ranges for each marker in the timeline
@@ -91,14 +91,13 @@ def get_cam_data(context):
 
 def save_render_rgb_img(context, path):
     scene = context.scene
-    for frame_num in range(scene.frame_start, scene.frame_end):
+    for frame_num in range(scene.frame_start, 10):
         scene.frame_set(frame_num)
         scene.render.image_settings.file_format='JPEG'
         scene.render.filepath = f"{path}_{frame_num}_rgb.jpg"
         bpy.ops.render.render(use_viewport = True, write_still=True)
             
 def save_render_depth_img(context, path):
-    scene = context.scene
     bpy.context.scene.use_nodes = True
     tree = bpy.context.scene.node_tree
     links = tree.links
@@ -120,10 +119,13 @@ def save_render_depth_img(context, path):
     output = tree.nodes.new(type="CompositorNodeOutputFile")
     output.base_path = "C:\\Users\\yun\\Desktop"
     links.new(invert.outputs[0], output.inputs[0])
-    for frame_num in range(scene.frame_start, scene.frame_end):
-        scene.frame_set(frame_num)
-        scene.render.filepath = f"{path}_{frame_num}_depth.jpg"
-        bpy.ops.render.render(use_viewport = True, write_still=True)
+    for frame_num in range(context.scene.frame_start, context.scene.frame_end):
+        context.scene.frame_set(frame_num)
+        bpy.context.scene.render.filepath = f"{path}_{frame_num}_depth.jpg"
+        bpy.ops.render.render(False, animation=False, write_still=True)
+        z = bpy.data.images['Viewer Node']
+        z.save(filepath=f"{path}_{frame_num}_depth.jpg")
+
         
 ######
 class ExportTxt(bpy.types.Operator, ExportHelper):
@@ -141,9 +143,9 @@ class ExportTxt(bpy.types.Operator, ExportHelper):
 
     def execute(self, context):
         extrinsic_mtx, intrinsic_mtx = get_cam_data(context)
-        save_render_rgb_img(context, self.filepath.split('.')[0])
-        # save_render_depth_img(context, self.filepath.split('.')[0])
         write_txt_file(self.filepath, extrinsic_mtx, intrinsic_mtx)
+        save_render_rgb_img(context, self.filepath.split('.')[0])
+        save_render_depth_img(context, self.filepath.split('.')[0])
         print("\nExport data Completed")
         return {'FINISHED'}
 
