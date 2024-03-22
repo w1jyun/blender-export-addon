@@ -97,9 +97,10 @@ def save_render_rgb_img(context, path):
         scene.render.filepath = f"{path}_{frame_num}_rgb.jpg"
         bpy.ops.render.render(use_viewport = True, write_still=True)
             
-def save_render_depth_img(context, path):
-    bpy.context.scene.use_nodes = True
-    tree = bpy.context.scene.node_tree
+def save_render_img(context, path):
+    context.scene.use_nodes = True
+    context.view_layer.use_pass_z = True
+    tree = context.scene.node_tree
     links = tree.links
     # clear default nodes
     for n in tree.nodes:
@@ -117,17 +118,20 @@ def save_render_depth_img(context, path):
 
     links.new(rl.outputs[1], depthViewer.inputs[1])
     output = tree.nodes.new(type="CompositorNodeOutputFile")
-    output.base_path = "C:\\Users\\yun\\Desktop"
+    # output.base_path = path.split[:-1]
+    name_len = len(path.split('\\')[-1])
+    forder_path = path[:-name_len]
+    output.base_path = f"{forder_path}\\depth"
+
     links.new(invert.outputs[0], output.inputs[0])
+    
     ## TODO: change data according to frame number
+    context.scene.render.image_settings.file_format='JPEG'
     for frame_num in range(context.scene.frame_start, context.scene.frame_end):
         context.scene.frame_set(frame_num)
-        bpy.context.scene.render.filepath = f"{path}_{frame_num}_depth.jpg"
+        context.scene.render.filepath = f"{forder_path}\\rgb\\{frame_num:03d}.jpg"
         bpy.ops.render.render(False, animation=False, write_still=True)
-        z = bpy.data.images['Viewer Node']
-        z.save(filepath=f"{path}_{frame_num}_depth.jpg")
 
-        
 ######
 class ExportTxt(bpy.types.Operator, ExportHelper):
     """Export selected cameras and objects animation to After Effects"""
@@ -145,8 +149,7 @@ class ExportTxt(bpy.types.Operator, ExportHelper):
     def execute(self, context):
         extrinsic_mtx, intrinsic_mtx = get_cam_data(context)
         write_txt_file(self.filepath, extrinsic_mtx, intrinsic_mtx)
-        save_render_rgb_img(context, self.filepath.split('.')[0])
-        save_render_depth_img(context, self.filepath.split('.')[0])
+        save_render_img(context, self.filepath.split('.')[0])
         print("\nExport data Completed")
         return {'FINISHED'}
 
