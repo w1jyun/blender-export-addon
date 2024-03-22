@@ -1,61 +1,17 @@
 
 bl_info = {
-    "name": "Export: Camera Data (.txt)",
+    "name": "Export: Rendering Data",
     "description": "Export Cameras",
     "author": "Jiyun Won",
-    "location": "File > Export > Camera Data(.txt)",
+    "location": "File > Export > Rendering Data",
     "warning": "",
     "category": "Import-Export",
 }
 
 import bpy
 import os
-# import cv2
-from math import degrees
-from mathutils import Matrix, Vector, Color
 import numpy as np
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty, FloatProperty
-# from PIL import Image
-
-def get_camera_frame_ranges(scene, start, end):
-    """Get frame ranges for each marker in the timeline
-
-    For this, start at the end of the timeline,
-    iterate through each camera-bound marker in reverse,
-    and get the range from this marker to the end of the previous range.
-    """
-    markers = sorted((m for m in scene.timeline_markers if m.camera is not None),
-                     key=lambda m:m.frame, reverse=True)
-
-    if len(markers) <= 1:
-        return [[[start, end], scene.camera],]
-
-    camera_frame_ranges = []
-    current_frame = end
-    for m in markers:
-        if m.frame < current_frame:
-            camera_frame_ranges.append([[m.frame, current_frame + 1], m.camera])
-            current_frame = m.frame - 1
-    camera_frame_ranges.reverse()
-    camera_frame_ranges[0][0][0] = start
-    return camera_frame_ranges
-
-def write_txt_file(path, extrinsic_data, intrinsic_data):
-        # import pdb; pdb.set_trace()
-        with open(path, 'w+') as f:
-            print(intrinsic_data)
-            print(extrinsic_data)
-            frame = 0
-            for intr, extr in zip(intrinsic_data, extrinsic_data):
-                f.write(f"frame #{frame}\n")
-                f.write("intrinsic \n")
-                f.write(str(intr))
-                f.write("\n")
-                f.write("extrinsic \n")
-                f.write(str(extr))
-                f.write("\n")
-                frame += 1
 
 def get_intrinsic_matrix(scene, camera):        
         # scene.frame_set(frame_num)
@@ -72,32 +28,29 @@ def get_intrinsic_matrix(scene, camera):
         return np.array([[f_x, 0, c_x], [0, f_y, c_y], [0,   0,   1]]).astype('float32')    
 
 ## TODO: check blender xyz and openGL xyz (https://stackoverflow.com/questions/64977993/applying-opencv-pose-estimation-to-blender-camera)
-def get_extrinsic_matrix(scene, camera):
+def get_extrinsic_matrix(camera):
     return np.array([v for v in camera.matrix_basis]).reshape(4,4).astype('float32')
             
-def get_cam_data(context):
+def save_cam_data(context, path):
     scene = context.scene
     if context.scene.camera is None:
         raise AssertionError("Cannot find camera")
     else:
         camera = context.scene.camera
-        intrinsic_matrixes = []
-        extrinsic_matrixes = []
+        # intrinsic_matrixes = []
+        # extrinsic_matrixes = []
+        if not os.path.exists(f"{path}camera"):
+            os.makedirs(f"{path}camera")
+            os.makedirs(f"{path}camera\\intrinsic")
+            os.makedirs(f"{path}camera\\extrinsic")
+            
         for frame_num in range(scene.frame_start, scene.frame_end):
             scene.frame_set(frame_num)
-            intrinsic_matrixes.append(get_intrinsic_matrix(scene, camera))
-            extrinsic_matrixes.append(get_extrinsic_matrix(scene, camera))
-        return extrinsic_matrixes, intrinsic_matrixes
+            np.save(f"{path}camera\\intrinsic\\{frame_num:03d}", get_intrinsic_matrix(scene, camera))
+            np.save(f"{path}camera\\extrinsic\\{frame_num:03d}", get_extrinsic_matrix(camera))
+        # return extrinsic_matrixes, intrinsic_matrixes
 
-def save_render_rgb_img(context, path):
-    scene = context.scene
-    for frame_num in range(scene.frame_start, 10):
-        scene.frame_set(frame_num)
-        scene.render.image_settings.file_format='JPEG'
-        scene.render.filepath = f"{path}_{frame_num}_rgb.jpg"
-        bpy.ops.render.render(use_viewport = True, write_still=True)
-            
-def save_render_img(context, path):
+def save_render_img(context, forder_path):
     context.scene.use_nodes = True
     context.view_layer.use_pass_z = True
     tree = context.scene.node_tree
@@ -118,9 +71,9 @@ def save_render_img(context, path):
 
     links.new(rl.outputs[1], depthViewer.inputs[1])
     output = tree.nodes.new(type="CompositorNodeOutputFile")
-    # output.base_path = path.split[:-1]
-    name_len = len(path.split('\\')[-1])
-    forder_path = path[:-name_len]
+    # ('BMP', 'IRIS', 'PNG', 'JPEG', 'JPEG2000', 'TARGA', 'TARGA_RAW', 'CINEON', 'DPX', 'OPEN_EXR_MULTILAYER', 'OPEN_EXR', 'HDR', 'TIFF', 'WEBP')
+    output.format.file_format = "HDR"
+    output.format.color_depth = "32" 
     output.base_path = f"{forder_path}\\depth"
 
     links.new(invert.outputs[0], output.inputs[0])
@@ -133,12 +86,12 @@ def save_render_img(context, path):
         bpy.ops.render.render(False, animation=False, write_still=True)
 
 ######
-class ExportTxt(bpy.types.Operator, ExportHelper):
+class ExportData(bpy.types.Operator, ExportHelper):
     """Export selected cameras and objects animation to After Effects"""
-    bl_idname = "export.txt"
-    bl_label = "Export cameras"
+    bl_idname = "export.jpg"
+    bl_label = "Rendering images & save cameras"
     bl_options = {'PRESET', 'UNDO'}
-    filename_ext = ".txt"
+    filename_ext = ".jpg"
 
     @classmethod
     def poll(cls, context):
@@ -147,24 +100,26 @@ class ExportTxt(bpy.types.Operator, ExportHelper):
         return selected or camera
 
     def execute(self, context):
-        extrinsic_mtx, intrinsic_mtx = get_cam_data(context)
-        write_txt_file(self.filepath, extrinsic_mtx, intrinsic_mtx)
-        save_render_img(context, self.filepath.split('.')[0])
+        path = self.filepath.split('.')[0]
+        name_len = len(path.split('\\')[-1])
+        forder_path = path[:-name_len]
+        save_cam_data(context, forder_path)
+        save_render_img(context, forder_path)
         print("\nExport data Completed")
         return {'FINISHED'}
 
 
 def menu_func(self, context):
     self.layout.operator(
-        ExportTxt.bl_idname, text="Camera Data (.txt)")
+        ExportData.bl_idname, text="Export Rendering Data")
 
 def register():
-    bpy.utils.register_class(ExportTxt)
+    bpy.utils.register_class(ExportData)
     bpy.types.TOPBAR_MT_file_export.append(menu_func)
     
 
 def unregister():
-    bpy.utils.unregister_class(ExportTxt)
+    bpy.utils.unregister_class(ExportData)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func)
 
 register()
