@@ -9,7 +9,7 @@ This is Blender Addon for Export Rendering Data. If you install this addon and e
 5. Search for "Export: Rendering Data" using Perspective Views of Rectangles in the addon list.
 6. Activate the checkbox to use the addon. (If you want to keep the addon activated when blender restarts, open the menu (bottom left menu button) and choose Save Preferences.)
    
-### File Structure
+### Output File Structure
 ```
   root
     L camera
