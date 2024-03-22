@@ -72,18 +72,27 @@ def save_render_img(context, forder_path):
     links.new(rl.outputs[1], depthViewer.inputs[1])
     output = tree.nodes.new(type="CompositorNodeOutputFile")
     # ('BMP', 'IRIS', 'PNG', 'JPEG', 'JPEG2000', 'TARGA', 'TARGA_RAW', 'CINEON', 'DPX', 'OPEN_EXR_MULTILAYER', 'OPEN_EXR', 'HDR', 'TIFF', 'WEBP')
-    output.format.file_format = "HDR"
-    output.format.color_depth = "32" 
-    output.base_path = f"{forder_path}\\depth"
+    output.format.file_format = "JPEG"
+    output.format.color_depth = "8" 
+    output.base_path = f"{forder_path}\\depth_img"
 
     links.new(invert.outputs[0], output.inputs[0])
-    
-    ## TODO: change data according to frame number
+
     context.scene.render.image_settings.file_format='JPEG'
+    
+    w = context.scene.render.resolution_x
+    h = context.scene.render.resolution_y
+    
+    if not os.path.exists(f"{forder_path}depth"):
+        os.makedirs(f"{forder_path}depth")
+        
     for frame_num in range(context.scene.frame_start, context.scene.frame_end):
         context.scene.frame_set(frame_num)
         context.scene.render.filepath = f"{forder_path}\\rgb\\{frame_num:03d}.jpg"
         bpy.ops.render.render(False, animation=False, write_still=True)
+        pixels = np.array(bpy.data.images['Viewer Node'].pixels).reshape(h,w,4)
+        pixels = (pixels.transpose()[0]).transpose()
+        np.save(f"{forder_path}depth\\{frame_num:03d}", pixels.astype(np.float32))
 
 ######
 class ExportData(bpy.types.Operator, ExportHelper):
