@@ -92,6 +92,7 @@ def save_render_img(context, forder_path):
         bpy.ops.render.render(False, animation=False, write_still=True)
         pixels = np.array(bpy.data.images['Viewer Node'].pixels).reshape(h,w,4)
         pixels = (pixels.transpose()[0]).transpose()
+        pixels = np.flip(pixels, 0)
         np.save(f"{forder_path}depth\\{frame_num:03d}", pixels.astype(np.float32))
 
 ######
