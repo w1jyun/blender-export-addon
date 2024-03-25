@@ -27,8 +27,8 @@ This is Blender Addon for Export Rendering Data. If you install this addon and e
       L Image0002.hdr
       ...
     L depth
-      L 001.npy (h x w size numpy)
-      L 002.npy (h x w size numpy)
+      L 001.npy (h x w size, 32bit numpy)
+      L 002.npy
       ...
     L rgb
       L 001.jpg
